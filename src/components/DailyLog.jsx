@@ -126,6 +126,52 @@ function TimeInput({ label, target, value, onChange, disabled }) {
   )
 }
 
+function CheckboxButton({ label, checked, onChange, disabled }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <span className="text-sm text-stone-300">{label}</span>
+      <button
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`w-12 h-6 rounded-full transition-all relative disabled:opacity-50 ${
+          checked ? 'bg-emerald-700' : 'bg-stone-700'
+        }`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${
+          checked ? 'left-6' : 'left-0.5'
+        }`} />
+      </button>
+    </div>
+  )
+}
+
+function LectureInput({ label, max, value, onChange, disabled }) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-stone-300">{label}</span>
+        <span className="text-xs text-stone-500">{value}/{max} lectures</span>
+      </div>
+      <div className="flex gap-2">
+        {Array.from({ length: max + 1 }, (_, i) => i).map(n => (
+          <button
+            key={n}
+            disabled={disabled}
+            onClick={() => onChange(n)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+              value === n
+                ? 'bg-teal-800 text-white'
+                : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+            } disabled:opacity-50`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SectionCard({ title, children }) {
   return (
     <div className="bg-stone-900 rounded-2xl p-4 mb-3 border border-stone-800">
@@ -327,18 +373,7 @@ export default function DailyLog({ userId }) {
 
       {/* Quran */}
       <SectionCard title="Quran">
-        {Object.entries(habits.quran).map(([key, def]) => (
-          <TimeInput
-            key={key}
-            label={def.label}
-            target={def.target}
-            value={formData.quran[key] || 0}
-            onChange={val => updateQuran(key, val)}
-            disabled={isSubmitted}
-          />
-        ))}
-        {/* Cycle progress fields */}
-        <div className="border-t border-stone-800 pt-3 mt-1">
+        <div className="pt-1">
           <p className="text-xs text-stone-500 mb-3">Solo recitation position</p>
           <div className="flex gap-3">
             <div className="flex-1">
@@ -382,55 +417,45 @@ export default function DailyLog({ userId }) {
 
       {/* Learning */}
       <SectionCard title="Learning">
-        {Object.entries(habits.learning).map(([key, def]) => (
-          <TimeInput
-            key={key}
-            label={def.label}
-            target={def.target}
-            value={formData.learning[key] || 0}
-            onChange={val => updateLearning(key, val)}
-            disabled={isSubmitted}
-          />
-        ))}
+        {Object.entries(habits.learning).map(([key, def]) => {
+          if (def.type === 'boolean') {
+            return <CheckboxButton key={key} label={def.label} checked={!!formData.learning[key]} onChange={val => updateLearning(key, val)} disabled={isSubmitted} />
+          }
+          if (def.type === 'lectures') {
+            return <LectureInput key={key} label={def.label} max={def.max || 4} value={formData.learning[key] || 0} onChange={val => updateLearning(key, val)} disabled={isSubmitted} />
+          }
+          return <TimeInput key={key} label={def.label} target={def.target} value={formData.learning[key] || 0} onChange={val => updateLearning(key, val)} disabled={isSubmitted} />
+        })}
       </SectionCard>
 
       {/* Health */}
       <SectionCard title="Health">
-        {Object.entries(habits.health).map(([key, def]) => (
-          <TimeInput
-            key={key}
-            label={def.label}
-            target={def.target}
-            value={formData.health[key] || 0}
-            onChange={val => updateHealth(key, val)}
-            disabled={isSubmitted}
-          />
-        ))}
+        {Object.entries(habits.health).map(([key, def]) => {
+          if (def.type === 'boolean') {
+            return <CheckboxButton key={key} label={def.label} checked={!!formData.health[key]} onChange={val => updateHealth(key, val)} disabled={isSubmitted} />
+          }
+          return <TimeInput key={key} label={def.label} target={def.target} value={formData.health[key] || 0} onChange={val => updateHealth(key, val)} disabled={isSubmitted} />
+        })}
       </SectionCard>
 
       {/* Work */}
       {habits.work && Object.keys(habits.work).length > 0 && (
         <SectionCard title="Work">
-          {Object.entries(habits.work).map(([key, def]) => (
-            <TimeInput
-              key={key}
-              label={def.label}
-              target={def.target}
-              value={formData.work[key] || 0}
-              onChange={val => updateWork(key, val)}
-              disabled={isSubmitted}
-            />
-          ))}
+          {Object.entries(habits.work).map(([key, def]) => {
+            if (def.type === 'boolean') {
+              return <CheckboxButton key={key} label={def.label} checked={!!formData.work[key]} onChange={val => updateWork(key, val)} disabled={isSubmitted} />
+            }
+            return <TimeInput key={key} label={def.label} target={def.target} value={formData.work[key] || 0} onChange={val => updateWork(key, val)} disabled={isSubmitted} />
+          })}
         </SectionCard>
       )}
 
       {/* Journaling */}
       {habits.journaling && (
         <SectionCard title="Self">
-          <TimeInput
+          <CheckboxButton
             label={habits.journaling.label}
-            target={habits.journaling.target}
-            value={formData.learning.journaling || 0}
+            checked={!!formData.learning.journaling}
             onChange={val => updateLearning('journaling', val)}
             disabled={isSubmitted}
           />

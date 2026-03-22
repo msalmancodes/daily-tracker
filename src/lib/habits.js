@@ -9,17 +9,13 @@ export function getDayType(date) {
 }
 
 // Returns habit targets for a given day type
-// minutes: integer minutes, boolean: checkbox
+// minutes: integer minutes, boolean: checkbox, lectures: count
 export function getHabitsForDay(dayType) {
   const base = {
     prayers: { fajr: 'boolean', dhuhr: 'boolean', asr: 'boolean', maghrib: 'boolean', isha: 'boolean' },
-    quran: {
-      juz: { label: 'Solo Juz Recitation', target: 30 },
-      memorize: { label: 'Memorize 3–4 Pages', target: 30 },
-      recite: { label: 'Recite to Someone', target: 30 },
-    },
+    quran: {}, // time removed; juz_number + page tracked directly
     health: {
-      gym: { label: 'Gym', target: 60 },
+      gym: { label: 'Gym', type: 'boolean' },
     },
     learning: {
       reading: { label: 'Reading', target: 45 },
@@ -29,7 +25,6 @@ export function getHabitsForDay(dayType) {
   if (dayType === 'weekday') {
     return {
       ...base,
-      prayers: { ...base.prayers },
       learning: {
         ...base.learning,
         broad: { label: 'Broad Learning', target: 45 },
@@ -37,7 +32,7 @@ export function getHabitsForDay(dayType) {
       work: {
         office: { label: 'Office Work', target: 480 },
       },
-      journaling: { label: 'Journaling', target: 20 },
+      journaling: { label: 'Journaling', type: 'boolean' },
     }
   }
 
@@ -52,7 +47,7 @@ export function getHabitsForDay(dayType) {
       work: {
         office: { label: 'Office Work', target: 480 },
       },
-      journaling: { label: 'Journaling', target: 20 },
+      journaling: { label: 'Journaling', type: 'boolean' },
     }
   }
 
@@ -61,15 +56,16 @@ export function getHabitsForDay(dayType) {
     ...base,
     learning: {
       ...base.learning,
-      rl: { label: 'RL Study', target: 120 },
-      scholar: { label: 'Scholar Session', target: 120 },
-      finance: { label: 'Islamic Finance', target: 90 },
       iqbal: { label: 'Iqbal Study', target: 60 },
+      tech_learning: { label: 'Tech Learning', type: 'lectures', max: 4 },
+      scholar: { label: 'Scholar Session', type: 'boolean' },
+      finance: { label: 'Islamic Finance', type: 'lectures', max: 4 },
     },
     work: {
-      campus: { label: 'Campus Job', target: 360 },
+      camd: { label: 'CAMD', type: 'boolean' },
+      cps: { label: 'CPS Work', type: 'boolean' },
     },
-    journaling: { label: 'Journaling', target: 20 },
+    journaling: { label: 'Journaling', type: 'boolean' },
     current_affairs: 'boolean',
   }
 }
@@ -78,10 +74,10 @@ export function getHabitsForDay(dayType) {
 export function getEmptyLog(dayType) {
   return {
     prayers: { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false, jumuah: false },
-    quran: { juz: 0, memorize: 0, recite: 0, juz_number: null, page: null },
-    learning: { reading: 0, broad: 0, iqbal: 0, rl: 0, scholar: 0, finance: 0, journaling: 0 },
-    health: { gym: 0 },
-    work: { office: 0, campus: 0 },
+    quran: { juz_number: null, page: null },
+    learning: { reading: 0, broad: 0, iqbal: 0, tech_learning: 0, scholar: false, finance: 0, journaling: false },
+    health: { gym: false },
+    work: { office: 0, camd: false, cps: false },
     current_affairs: false,
     notes: '',
   }
@@ -131,7 +127,7 @@ export const SCHEDULE = {
     { start: t(6,15), duration: 60,  label: 'Breakfast + Current Affairs', category: 'self' },
     { start: t(9,0),  duration: 360, label: 'Campus Job',          category: 'work' },
     { start: t(16,15),duration: 30,  label: 'Asr + Recite to Someone', category: 'deen' },
-    { start: t(17,0), duration: 120, label: 'RL Study',            category: 'learning' },
+    { start: t(17,0), duration: 120, label: 'Tech Learning',       category: 'learning' },
     { start: t(19,0), duration: 120, label: 'Scholar Session',     category: 'deen' },
     { start: t(19,0), duration: 90,  label: 'Islamic Finance',     category: 'learning' },
     { start: t(20,30),duration: 60,  label: 'Iqbal Study',         category: 'learning' },

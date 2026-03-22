@@ -56,7 +56,6 @@ export default function QuranProgress({ userId }) {
         .from('daily_logs')
         .select('date, quran')
         .eq('user_id', userId)
-        .not('quran->juz_number', 'is', null)
         .order('date', { ascending: false })
         .limit(500),
     ])
@@ -75,13 +74,20 @@ export default function QuranProgress({ userId }) {
     cycleStartDate ? l.date >= cycleStartDate : true
   )
 
-  // Aggregate pages per juz: { 1: 8, 2: 20, 15: 4, ... }
+  // Aggregate pages per juz across all cycle logs
+  // Supports new format (memorization dict) and old format (juz_number + page)
   const juzPages = {}
   for (const log of cycleLogs) {
-    const juz = log.quran?.juz_number
-    const pages = log.quran?.page || 0
-    if (juz && pages > 0) {
-      juzPages[juz] = (juzPages[juz] || 0) + pages
+    const mem = log.quran?.memorization
+    if (mem && typeof mem === 'object' && Object.keys(mem).length > 0) {
+      for (const [juzKey, pages] of Object.entries(mem)) {
+        const n = parseInt(juzKey)
+        if (n && pages > 0) juzPages[n] = (juzPages[n] || 0) + pages
+      }
+    } else if (log.quran?.juz_number && log.quran?.page > 0) {
+      // Legacy format
+      const n = log.quran.juz_number
+      juzPages[n] = (juzPages[n] || 0) + log.quran.page
     }
   }
 

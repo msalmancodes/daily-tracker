@@ -74,7 +74,7 @@ export function getHabitsForDay(dayType) {
 export function getEmptyLog(dayType) {
   return {
     prayers: { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false, jumuah: false },
-    quran: { juz_number: null, page: null },
+    quran: { memorization: {}, recitation: 0 },
     learning: { reading: 0, broad: 0, iqbal: 0, tech_learning: { time: 0, lectures: false, project: false }, scholar: false, finance: 0, journaling: false },
     health: { gym: false },
     work: { office: 0, camd: false, cps: false },

@@ -172,6 +172,118 @@ function LectureInput({ label, max, value, onChange, disabled }) {
   )
 }
 
+const RECITATION_PRESETS = [
+  { label: '0', val: 0 },
+  { label: '¼', val: 0.25 },
+  { label: '½', val: 0.5 },
+  { label: '¾', val: 0.75 },
+  { label: '1', val: 1 },
+  { label: '1¼', val: 1.25 },
+  { label: '1½', val: 1.5 },
+  { label: '1¾', val: 1.75 },
+  { label: '2', val: 2 },
+]
+
+function formatRecitation(val) {
+  const map = { 0.25: '¼', 0.5: '½', 0.75: '¾', 1.25: '1¼', 1.5: '1½', 1.75: '1¾' }
+  return map[val] !== undefined ? map[val] : String(val)
+}
+
+function QuranSection({ quranData, onUpdate, disabled }) {
+  const mem = (quranData?.memorization && typeof quranData.memorization === 'object')
+    ? quranData.memorization : {}
+  const recitation = quranData?.recitation || 0
+
+  function toggleJuz(n) {
+    const key = String(n)
+    const next = { ...mem }
+    if (key in next) { delete next[key] } else { next[key] = 0 }
+    onUpdate('memorization', next)
+  }
+
+  function setPages(juzKey, pages) {
+    onUpdate('memorization', { ...mem, [juzKey]: pages })
+  }
+
+  const selectedJuz = Object.entries(mem).sort(([a], [b]) => parseInt(a) - parseInt(b))
+
+  return (
+    <>
+      {/* Memorization */}
+      <div className="mb-4">
+        <p className="text-xs font-medium text-stone-400 mb-2">Memorization</p>
+        <p className="text-xs text-stone-600 mb-2">Tap juz to select, then enter pages done today</p>
+        <div className="grid grid-cols-6 gap-1.5 mb-3">
+          {Array.from({ length: 30 }, (_, i) => i + 1).map(n => {
+            const isSelected = String(n) in mem
+            return (
+              <button
+                key={n}
+                disabled={disabled}
+                onClick={() => toggleJuz(n)}
+                className={`aspect-square rounded-lg text-xs font-semibold transition-all active:scale-95 ${
+                  isSelected
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                } disabled:opacity-50`}
+              >
+                {n}
+              </button>
+            )
+          })}
+        </div>
+
+        {selectedJuz.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {selectedJuz.map(([juzKey, pages]) => (
+              <div key={juzKey} className="flex items-center gap-2">
+                <span className="text-xs text-stone-400 w-10 shrink-0">Juz {juzKey}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  disabled={disabled}
+                  value={pages || ''}
+                  onChange={e => setPages(juzKey, parseInt(e.target.value) || 0)}
+                  placeholder="pages"
+                  className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-stone-600 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                />
+                <span className="text-xs text-stone-600 shrink-0">/ 20</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recitation */}
+      <div className="border-t border-stone-800 pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-stone-400">Recitation</p>
+          {recitation > 0 && (
+            <span className="text-xs text-teal-400">{formatRecitation(recitation)} juz</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {RECITATION_PRESETS.map(({ label, val }) => (
+            <button
+              key={val}
+              disabled={disabled}
+              onClick={() => onUpdate('recitation', val)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+                recitation === val
+                  ? 'bg-teal-800 text-white'
+                  : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+              } disabled:opacity-50`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 function TechLearningInput({ value, onChange, disabled }) {
   const val = value && typeof value === 'object' ? value : { time: 0, lectures: false, project: false }
   return (
@@ -422,46 +534,11 @@ export default function DailyLog({ userId }) {
 
       {/* Quran */}
       <SectionCard title="Quran">
-        <div className="pt-1">
-          <p className="text-xs text-stone-500 mb-3">Solo recitation position</p>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-xs text-stone-400 mb-1.5">Juz</label>
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
-                  <button
-                    key={n}
-                    disabled={isSubmitted}
-                    onClick={() => updateQuran('juz_number', formData.quran.juz_number === n ? null : n)}
-                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-all active:scale-95 ${
-                      formData.quran.juz_number === n
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-stone-800 text-stone-400'
-                    } disabled:opacity-50`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="w-24">
-              <label className="block text-xs text-stone-400 mb-1.5">Pages today</label>
-              <input
-                type="number"
-                min="0"
-                max="20"
-                disabled={isSubmitted}
-                value={formData.quran.page ?? ''}
-                onChange={e => {
-                  const v = parseInt(e.target.value)
-                  updateQuran('page', !isNaN(v) && v >= 0 && v <= 20 ? v : null)
-                }}
-                placeholder="0–20"
-                className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-sm text-white placeholder-stone-600 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
-              />
-            </div>
-          </div>
-        </div>
+        <QuranSection
+          quranData={formData.quran}
+          onUpdate={updateQuran}
+          disabled={isSubmitted}
+        />
       </SectionCard>
 
       {/* Learning */}

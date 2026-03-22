@@ -1,7 +1,92 @@
 import { useState, useEffect } from 'react'
-import { format, subDays, parseISO, isToday } from 'date-fns'
+import { format, subDays, parseISO, isToday, startOfMonth, endOfMonth,
+         startOfWeek, endOfWeek, eachDayOfInterval, addMonths, subMonths, isSameMonth } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { getDayType, getHabitsForDay, getEmptyLog } from '../lib/habits'
+
+function MiniCalendar({ selectedDate, onSelect, submittedDates, logSummaries }) {
+  const [viewMonth, setViewMonth] = useState(new Date(selectedDate + 'T00:00:00'))
+  const today = format(new Date(), 'yyyy-MM-dd')
+
+  const monthStart = startOfMonth(viewMonth)
+  const monthEnd = endOfMonth(viewMonth)
+  const calStart = startOfWeek(monthStart, { weekStartsOn: 0 })
+  const calEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
+  const allDays = eachDayOfInterval({ start: calStart, end: calEnd })
+
+  return (
+    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 mb-3">
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => setViewMonth(m => subMonths(m, 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:bg-stone-800 active:scale-95 transition-all text-lg"
+        >‹</button>
+        <span className="text-sm font-semibold text-stone-200">
+          {format(viewMonth, 'MMMM yyyy')}
+        </span>
+        <button
+          onClick={() => setViewMonth(m => addMonths(m, 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:bg-stone-800 active:scale-95 transition-all text-lg"
+        >›</button>
+      </div>
+
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {['S','M','T','W','T','F','S'].map((d, i) => (
+          <div key={i} className="text-center text-[10px] text-stone-500 font-medium py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div className="grid grid-cols-7 gap-y-1">
+        {allDays.map(day => {
+          const key = format(day, 'yyyy-MM-dd')
+          const isSelected = key === selectedDate
+          const isT = key === today
+          const hasLog = submittedDates.has(key)
+          const inMonth = isSameMonth(day, viewMonth)
+          const hasSummary = !!logSummaries[key]
+
+          return (
+            <button
+              key={key}
+              onClick={() => onSelect(key)}
+              className={`relative flex flex-col items-center justify-center rounded-xl py-1.5 transition-all active:scale-95 ${
+                isSelected
+                  ? 'bg-teal-800 text-white'
+                  : isT
+                  ? 'bg-teal-950/60 text-teal-300 border border-teal-900'
+                  : hasLog
+                  ? 'bg-stone-800 text-stone-200'
+                  : 'text-stone-500 hover:bg-stone-800'
+              } ${!inMonth ? 'opacity-25' : ''}`}
+            >
+              <span className="text-xs font-medium leading-none">{format(day, 'd')}</span>
+              {hasLog && (
+                <span className={`w-1 h-1 rounded-full mt-0.5 ${
+                  hasSummary ? 'bg-teal-400' : 'bg-emerald-500'
+                }`} />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-4 mt-3 pt-3 border-t border-stone-800">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="text-[10px] text-stone-500">Logged</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+          <span className="text-[10px] text-stone-500">+ AI summary</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function TimeInput({ label, target, value, onChange, disabled }) {
   const presets = [0, Math.round(target / 2), target, Math.round(target * 1.5)]
@@ -59,23 +144,23 @@ export default function DailyLog({ userId }) {
   const [saving, setSaving] = useState(false)
   const [generatingSummary, setGeneratingSummary] = useState(false)
   const [loadingDate, setLoadingDate] = useState(false)
-
-  // Last 7 days
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = subDays(new Date(), 6 - i)
-    return format(d, 'yyyy-MM-dd')
-  })
+  const [logSummaries, setLogSummaries] = useState({}) // date -> ai_summary
 
   // Load submitted dates on mount
   useEffect(() => {
     async function loadDates() {
-      const since = format(subDays(new Date(), 30), 'yyyy-MM-dd')
+      const since = format(subDays(new Date(), 365), 'yyyy-MM-dd')
       const { data } = await supabase
         .from('daily_logs')
-        .select('date')
+        .select('date, ai_summary')
         .eq('user_id', userId)
         .gte('date', since)
-      if (data) setSubmittedDates(new Set(data.map(r => r.date)))
+      if (data) {
+        setSubmittedDates(new Set(data.map(r => r.date)))
+        const summaries = {}
+        data.forEach(r => { if (r.ai_summary) summaries[r.date] = r.ai_summary })
+        setLogSummaries(summaries)
+      }
     }
     loadDates()
   }, [userId])
@@ -148,6 +233,7 @@ export default function DailyLog({ userId }) {
           .eq('user_id', userId)
           .eq('date', payload.date)
         setFormData(f => ({ ...f, ai_summary: data.summary }))
+        setLogSummaries(prev => ({ ...prev, [payload.date]: data.summary }))
       }
     } catch (_) {}
     setGeneratingSummary(false)
@@ -191,34 +277,13 @@ export default function DailyLog({ userId }) {
 
   return (
     <div className="p-4">
-      {/* Day Picker */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
-        {days.map(d => {
-          const dateObj = new Date(d + 'T00:00:00')
-          const isSelected = d === selectedDate
-          const hasLog = submittedDates.has(d)
-          const todayDate = isToday(dateObj)
-          return (
-            <button
-              key={d}
-              onClick={() => setSelectedDate(d)}
-              className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] transition-all active:scale-95 relative ${
-                isSelected
-                  ? 'bg-teal-800 text-white'
-                  : todayDate
-                  ? 'bg-teal-950/60 text-teal-300 border border-teal-900'
-                  : 'bg-stone-900 text-stone-400 border border-stone-800'
-              }`}
-            >
-              <span className="text-[10px] font-medium uppercase">{format(dateObj, 'EEE')}</span>
-              <span className="text-base font-semibold leading-tight">{format(dateObj, 'd')}</span>
-              {hasLog && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-0.5" />
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {/* Calendar */}
+      <MiniCalendar
+        selectedDate={selectedDate}
+        onSelect={setSelectedDate}
+        submittedDates={submittedDates}
+        logSummaries={logSummaries}
+      />
 
       {/* Submitted banner */}
       {isSubmitted && (

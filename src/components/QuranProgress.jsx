@@ -3,12 +3,9 @@ import { format, parseISO, differenceInDays } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { PAGES_PER_JUZ, JUZ_COUNT } from '../lib/habits'
 
-function CycleArc({ currentJuz, currentPage }) {
-  const totalPages = JUZ_COUNT * PAGES_PER_JUZ
-  const pagesCompleted = currentJuz
-    ? (currentJuz - 1) * PAGES_PER_JUZ + (currentPage || 0)
-    : 0
-  const pct = totalPages > 0 ? pagesCompleted / totalPages : 0
+function CycleArc({ totalPages }) {
+  const maxPages = JUZ_COUNT * PAGES_PER_JUZ
+  const pct = maxPages > 0 ? totalPages / maxPages : 0
 
   const size = 180
   const r = 76
@@ -35,7 +32,7 @@ function CycleArc({ currentJuz, currentPage }) {
       <div className="flex flex-col items-center -mt-[108px] mb-[36px]">
         <span className="text-3xl font-bold text-stone-100">{Math.round(pct * 100)}%</span>
         <span className="text-xs text-stone-400 mt-0.5">
-          {pagesCompleted} / {totalPages} pages
+          {totalPages} / {maxPages} pages
         </span>
       </div>
     </div>
@@ -61,7 +58,7 @@ export default function QuranProgress({ userId }) {
         .eq('user_id', userId)
         .not('quran->juz_number', 'is', null)
         .order('date', { ascending: false })
-        .limit(200),
+        .limit(500),
     ])
     setCycles(cycleData || [])
     setRecentLogs(logData || [])
@@ -72,20 +69,30 @@ export default function QuranProgress({ userId }) {
 
   const activeCycle = cycles.find(c => !c.completed_at)
   const cycleStartDate = activeCycle?.started_at || null
+
+  // Only count logs within the active cycle period
   const cycleLogs = recentLogs.filter(l =>
     cycleStartDate ? l.date >= cycleStartDate : true
   )
 
-  const latestLog = cycleLogs[0]
-  const currentJuz = latestLog?.quran?.juz_number || null
-  const currentPage = latestLog?.quran?.page || null
-
-  function juzStatus(n) {
-    if (!currentJuz) return 'untouched'
-    if (n < currentJuz) return 'complete'
-    if (n === currentJuz) return 'current'
-    return 'untouched'
+  // Aggregate pages per juz: { 1: 8, 2: 20, 15: 4, ... }
+  const juzPages = {}
+  for (const log of cycleLogs) {
+    const juz = log.quran?.juz_number
+    const pages = log.quran?.page || 0
+    if (juz && pages > 0) {
+      juzPages[juz] = (juzPages[juz] || 0) + pages
+    }
   }
+
+  // Total pages accumulated (capped per juz at PAGES_PER_JUZ)
+  const totalPages = Object.values(juzPages).reduce(
+    (sum, p) => sum + Math.min(p, PAGES_PER_JUZ), 0
+  )
+
+  // Cycle complete when all 30 juz have >= 20 pages
+  const allComplete = Array.from({ length: JUZ_COUNT }, (_, i) => i + 1)
+    .every(n => (juzPages[n] || 0) >= PAGES_PER_JUZ)
 
   const daysRunning = activeCycle
     ? differenceInDays(new Date(), parseISO(activeCycle.started_at)) + 1
@@ -145,7 +152,7 @@ export default function QuranProgress({ userId }) {
       {/* Active cycle */}
       {activeCycle && (
         <>
-          {/* Header */}
+          {/* Header + Arc */}
           <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-lg font-bold text-stone-100">Cycle {activeCycle.cycle_number}</span>
@@ -158,53 +165,49 @@ export default function QuranProgress({ userId }) {
               <span>{daysRunning} day{daysRunning !== 1 ? 's' : ''}</span>
             </div>
 
-            <CycleArc currentJuz={currentJuz} currentPage={currentPage} />
+            <CycleArc totalPages={totalPages} />
 
-            {currentJuz ? (
-              <div className="text-center -mt-2 mb-2">
-                <span className="text-base font-semibold text-stone-100">Juz {currentJuz}</span>
-                {currentPage && (
-                  <span className="text-stone-400 text-sm"> · Page {currentPage} of {PAGES_PER_JUZ}</span>
-                )}
-              </div>
-            ) : (
-              <p className="text-center text-stone-500 text-sm -mt-2 mb-2">
-                Log a day with your juz position to start tracking
-              </p>
-            )}
+            <p className="text-center text-stone-500 text-xs -mt-2 mb-1">
+              {Object.values(juzPages).filter(p => p >= PAGES_PER_JUZ).length} of 30 juz complete
+            </p>
           </div>
 
           {/* 30-Juz Grid */}
           <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4">
             <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
-              Juz Progress
+              Juz Progress — each day adds to the total
             </h3>
             <div className="grid grid-cols-6 gap-2">
               {Array.from({ length: JUZ_COUNT }, (_, i) => i + 1).map(n => {
-                const status = juzStatus(n)
+                const pages = juzPages[n] || 0
+                const isComplete = pages >= PAGES_PER_JUZ
+                const hasProgress = pages > 0 && !isComplete
+                const fillPct = Math.min(pages / PAGES_PER_JUZ, 1)
+
                 return (
                   <div
                     key={n}
                     className={`aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-semibold transition-all relative overflow-hidden ${
-                      status === 'complete'
+                      isComplete
                         ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-800'
-                        : status === 'current'
-                        ? 'bg-teal-900/60 text-teal-200 border border-teal-700 ring-1 ring-teal-600'
+                        : hasProgress
+                        ? 'bg-teal-900/40 text-teal-200 border border-teal-800'
                         : 'bg-stone-800 text-stone-500'
                     }`}
                   >
-                    {status === 'current' && currentPage && (
+                    {/* Fill bar from bottom */}
+                    {hasProgress && (
                       <div
                         className="absolute bottom-0 left-0 right-0 bg-teal-700/30"
-                        style={{ height: `${(currentPage / PAGES_PER_JUZ) * 100}%` }}
+                        style={{ height: `${fillPct * 100}%` }}
                       />
                     )}
                     <span className="relative z-10">{n}</span>
-                    {status === 'complete' && (
+                    {isComplete && (
                       <span className="relative z-10 text-[8px] text-emerald-500">✓</span>
                     )}
-                    {status === 'current' && currentPage && (
-                      <span className="relative z-10 text-[8px] text-teal-400">{currentPage}/20</span>
+                    {hasProgress && (
+                      <span className="relative z-10 text-[8px] text-teal-400">{Math.min(pages, 20)}/20</span>
                     )}
                   </div>
                 )
@@ -212,9 +215,9 @@ export default function QuranProgress({ userId }) {
             </div>
             <div className="flex gap-4 mt-3">
               {[
-                { color: 'bg-emerald-900/60 border border-emerald-800', label: 'Complete' },
-                { color: 'bg-teal-900/60 border border-teal-700',       label: 'Current' },
-                { color: 'bg-stone-800',                                 label: 'Upcoming' },
+                { color: 'bg-emerald-900/60 border border-emerald-800', label: 'Complete (≥20p)' },
+                { color: 'bg-teal-900/40 border border-teal-800',       label: 'In progress' },
+                { color: 'bg-stone-800',                                 label: 'Not started' },
               ].map(l => (
                 <div key={l.label} className="flex items-center gap-1.5">
                   <div className={`w-2.5 h-2.5 rounded ${l.color}`} />
@@ -224,8 +227,8 @@ export default function QuranProgress({ userId }) {
             </div>
           </div>
 
-          {/* Complete cycle button */}
-          {currentJuz === JUZ_COUNT && (
+          {/* Complete cycle button — only when all 30 juz done */}
+          {allComplete && (
             <button
               onClick={completeCycle}
               disabled={completing}

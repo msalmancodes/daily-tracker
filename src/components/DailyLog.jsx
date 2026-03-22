@@ -445,18 +445,18 @@ export default function DailyLog({ userId }) {
               </div>
             </div>
             <div className="w-24">
-              <label className="block text-xs text-stone-400 mb-1.5">Page (1–20)</label>
+              <label className="block text-xs text-stone-400 mb-1.5">Pages today</label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 max="20"
                 disabled={isSubmitted}
-                value={formData.quran.page || ''}
+                value={formData.quran.page ?? ''}
                 onChange={e => {
                   const v = parseInt(e.target.value)
-                  updateQuran('page', v >= 1 && v <= 20 ? v : null)
+                  updateQuran('page', !isNaN(v) && v >= 0 && v <= 20 ? v : null)
                 }}
-                placeholder="—"
+                placeholder="0–20"
                 className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-sm text-white placeholder-stone-600 focus:outline-none focus:border-emerald-500 disabled:opacity-50"
               />
             </div>

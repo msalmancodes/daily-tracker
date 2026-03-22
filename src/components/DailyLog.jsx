@@ -172,6 +172,55 @@ function LectureInput({ label, max, value, onChange, disabled }) {
   )
 }
 
+function TechLearningInput({ value, onChange, disabled }) {
+  const val = value && typeof value === 'object' ? value : { time: 0, lectures: false, project: false }
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-stone-300">Tech Learning</span>
+        <span className="text-xs text-stone-500">{val.time ? `${val.time}m` : '—'}</span>
+      </div>
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {[0, 60, 120].map(p => (
+          <button
+            key={p}
+            disabled={disabled}
+            onClick={() => onChange({ ...val, time: p })}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+              val.time === p ? 'bg-teal-800 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+            } disabled:opacity-50`}
+          >
+            {p === 0 ? '0' : p === 60 ? '1 hr' : '2 hr'}
+          </button>
+        ))}
+        <input
+          type="number"
+          min="0"
+          disabled={disabled}
+          value={val.time || ''}
+          onChange={e => onChange({ ...val, time: parseInt(e.target.value) || 0 })}
+          placeholder="custom"
+          className="w-20 bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-stone-600 focus:outline-none focus:border-teal-600 disabled:opacity-50"
+        />
+      </div>
+      <div className="flex gap-2">
+        {[{ key: 'lectures', label: 'Lectures' }, { key: 'project', label: 'Project' }].map(({ key, label }) => (
+          <button
+            key={key}
+            disabled={disabled}
+            onClick={() => onChange({ ...val, [key]: !val[key] })}
+            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
+              val[key] ? 'bg-teal-800 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+            } disabled:opacity-50`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SectionCard({ title, children }) {
   return (
     <div className="bg-stone-900 rounded-2xl p-4 mb-3 border border-stone-800">
@@ -420,6 +469,9 @@ export default function DailyLog({ userId }) {
         {Object.entries(habits.learning).map(([key, def]) => {
           if (def.type === 'boolean') {
             return <CheckboxButton key={key} label={def.label} checked={!!formData.learning[key]} onChange={val => updateLearning(key, val)} disabled={isSubmitted} />
+          }
+          if (def.type === 'tech_learning') {
+            return <TechLearningInput key={key} value={formData.learning[key]} onChange={val => updateLearning(key, val)} disabled={isSubmitted} />
           }
           if (def.type === 'lectures') {
             return <LectureInput key={key} label={def.label} max={def.max || 4} value={formData.learning[key] || 0} onChange={val => updateLearning(key, val)} disabled={isSubmitted} />

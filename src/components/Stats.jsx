@@ -110,6 +110,7 @@ export default function Stats({ userId }) {
   function habitScore(def, value) {
     if (!def || typeof def !== 'object') return null
     if (def.type === 'boolean') return { target: 1, actual: value ? 1 : 0 }
+    if (def.type === 'tech_learning') return { target: def.timeTarget || 120, actual: Math.min(value?.time || 0, def.timeTarget || 120) }
     if (def.type === 'lectures') return { target: def.max || 4, actual: Math.min(value || 0, def.max || 4) }
     if (def.target) return { target: def.target, actual: Math.min(value || 0, def.target) }
     return null
@@ -214,7 +215,14 @@ export default function Stats({ userId }) {
       const habits = getHabitsForDay(d)
       const log = logMap[format(d, 'yyyy-MM-dd')]
       for (const [k, def] of Object.entries(habits.learning)) {
-        if (!def?.target || def.type) continue
+        if (!def || typeof def !== 'object') continue
+        if (def.type === 'tech_learning') {
+          const t = def.timeTarget || 120
+          targets[def.label] = (targets[def.label] || 0) + t
+          totals[def.label] = (totals[def.label] || 0) + (log ? Math.min(log.learning?.[k]?.time || 0, t) : 0)
+          continue
+        }
+        if (!def.target || def.type) continue
         targets[def.label] = (targets[def.label] || 0) + def.target
         totals[def.label] = (totals[def.label] || 0) + (log ? Math.min(log.learning?.[k] || 0, def.target) : 0)
       }
@@ -282,7 +290,9 @@ export default function Stats({ userId }) {
           'Reading (min)': learning.reading || 0,
           'Broad Learning (min)': learning.broad || 0,
           'Iqbal Study (min)': learning.iqbal || 0,
-          'Tech Learning (lectures)': learning.tech_learning || 0,
+          'Tech Learning (min)': learning.tech_learning?.time || 0,
+          'Tech Learning — Lectures': learning.tech_learning?.lectures ? 'Yes' : 'No',
+          'Tech Learning — Project': learning.tech_learning?.project ? 'Yes' : 'No',
           'Scholar Session': learning.scholar ? 'Yes' : 'No',
           'Islamic Finance (lectures)': learning.finance || 0,
           'Journaling': learning.journaling ? 'Yes' : 'No',

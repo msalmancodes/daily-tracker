@@ -13,8 +13,12 @@ create table if not exists daily_logs (
   work jsonb not null default '{"office":0,"campus":0}',
   current_affairs boolean default false,
   notes text default '',
+  ai_summary text default '',
   unique(user_id, date)
 );
+
+-- Run this if the table already exists:
+-- alter table daily_logs add column if not exists ai_summary text default '';
 
 -- quran jsonb now includes juz_number (int 1-30) and page (int 1-20) for cycle tracking
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, parseISO } from 'date-fns'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { getDayType, getHabitsForDay } from '../lib/habits'
 
@@ -214,6 +215,63 @@ export default function Stats({ userId }) {
   // Prayer grid: 5 prayers x last 7 days
   const prayerNames = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
 
+  function exportToExcel() {
+    const rows = [...logs]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(log => {
+        const prayers = log.prayers || {}
+        const prayersDone = ['fajr','dhuhr','asr','maghrib','isha'].filter(p => prayers[p]).length
+        const quran = log.quran || {}
+        const learning = log.learning || {}
+        const health = log.health || {}
+        const work = log.work || {}
+        const totalStudy = (learning.reading||0) + (learning.broad||0) +
+          (learning.iqbal||0) + (learning.rl||0) + (learning.scholar||0) + (learning.finance||0)
+        const totalQuran = (quran.juz||0) + (quran.memorize||0) + (quran.recite||0)
+
+        return {
+          'Date': log.date,
+          'Prayers (/ 5)': prayersDone,
+          "Jumu'ah": prayers.jumuah ? 'Yes' : '—',
+          'Quran — Juz Recitation (min)': quran.juz || 0,
+          'Quran — Memorization (min)': quran.memorize || 0,
+          'Quran — Recite to Someone (min)': quran.recite || 0,
+          'Quran Total (min)': totalQuran,
+          'Juz #': quran.juz_number || '—',
+          'Page': quran.page || '—',
+          'Study Total (min)': totalStudy,
+          'Reading (min)': learning.reading || 0,
+          'Broad Learning (min)': learning.broad || 0,
+          'Iqbal Study (min)': learning.iqbal || 0,
+          'RL Study (min)': learning.rl || 0,
+          'Scholar Session (min)': learning.scholar || 0,
+          'Islamic Finance (min)': learning.finance || 0,
+          'Journaling (min)': learning.journaling || 0,
+          'Gym (min)': health.gym || 0,
+          'Office Work (min)': work.office || 0,
+          'Campus Job (min)': work.campus || 0,
+          'Current Affairs': log.current_affairs ? 'Yes' : 'No',
+          'Reflection': log.notes || '',
+          'AI Summary': log.ai_summary || '',
+        }
+      })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+    // Column widths
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 26 }, { wch: 24 }, { wch: 26 }, { wch: 18 },
+      { wch: 8 }, { wch: 8 },
+      { wch: 18 }, { wch: 14 }, { wch: 20 }, { wch: 16 },
+      { wch: 16 }, { wch: 20 }, { wch: 22 }, { wch: 18 },
+      { wch: 12 }, { wch: 18 }, { wch: 18 },
+      { wch: 16 }, { wch: 40 }, { wch: 60 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Daily Logs')
+    XLSX.writeFile(wb, `daily-routine-${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-48 text-stone-500">Loading…</div>
   }
@@ -324,6 +382,14 @@ export default function Stats({ userId }) {
           </table>
         </div>
       </div>
+
+      {/* Export */}
+      <button
+        onClick={exportToExcel}
+        className="w-full bg-stone-900 hover:bg-stone-800 active:scale-95 border border-stone-700 text-stone-300 font-medium rounded-2xl py-3.5 transition-all text-sm"
+      >
+        Export to Excel (.xlsx)
+      </button>
     </div>
   )
 }

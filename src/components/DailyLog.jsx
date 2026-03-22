@@ -57,6 +57,7 @@ export default function DailyLog({ userId }) {
   const [formData, setFormData] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [generatingSummary, setGeneratingSummary] = useState(false)
   const [loadingDate, setLoadingDate] = useState(false)
 
   // Last 7 days
@@ -125,6 +126,33 @@ export default function DailyLog({ userId }) {
     setFormData(f => ({ ...f, work: { ...f.work, [key]: val } }))
   }
 
+  async function generateAISummary(payload) {
+    setGeneratingSummary(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-summary', {
+        body: {
+          date: payload.date,
+          prayers: payload.prayers,
+          quran: payload.quran,
+          learning: payload.learning,
+          health: payload.health,
+          work: payload.work,
+          notes: payload.notes,
+          dayType,
+        },
+      })
+      if (!error && data?.summary) {
+        await supabase
+          .from('daily_logs')
+          .update({ ai_summary: data.summary })
+          .eq('user_id', userId)
+          .eq('date', payload.date)
+        setFormData(f => ({ ...f, ai_summary: data.summary }))
+      }
+    } catch (_) {}
+    setGeneratingSummary(false)
+  }
+
   async function handleSubmit() {
     setSaving(true)
     const payload = {
@@ -138,6 +166,7 @@ export default function DailyLog({ userId }) {
       work: formData.work,
       current_affairs: formData.current_affairs || false,
       notes: formData.notes || '',
+      ai_summary: formData.ai_summary || '',
     }
 
     const { error } = await supabase
@@ -148,6 +177,7 @@ export default function DailyLog({ userId }) {
       setSubmittedDates(prev => new Set([...prev, selectedDate]))
       setLogs(prev => ({ ...prev, [selectedDate]: { ...payload } }))
       setIsEditing(false)
+      generateAISummary(payload)
     }
     setSaving(false)
   }
@@ -369,6 +399,21 @@ export default function DailyLog({ userId }) {
           className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-stone-600 focus:outline-none focus:border-teal-600 resize-none disabled:opacity-60"
         />
       </SectionCard>
+
+      {/* AI Summary */}
+      {(formData.ai_summary || generatingSummary) && (
+        <div className="bg-stone-900 border border-stone-700 rounded-2xl p-4 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-teal-500 uppercase tracking-wider">AI Reflection</span>
+            {generatingSummary && (
+              <span className="text-xs text-stone-500 animate-pulse">Generating…</span>
+            )}
+          </div>
+          {formData.ai_summary && (
+            <p className="text-sm text-stone-300 leading-relaxed">{formData.ai_summary}</p>
+          )}
+        </div>
+      )}
 
       {/* Submit */}
       {!isSubmitted && (
